@@ -1,35 +1,45 @@
+import sys
+import logging
 from agents.master_agent import MasterAgent
+from core.client import initialize_client
+from core.database import save_score, get_best_score
+
+# Logging konfigurieren
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
-def start_system():
-    print("🤖 --- Personal Agent System wird gestartet --- 🤖")
-    print("Initialisiere Master-Agent...")
+def run_agent():
+    logging.info("Starte Personal Agent System...")
 
-    # Master Agent wird zum Leben erweckt
-    master = MasterAgent()
+    # 1. System initialisieren
+    client = initialize_client()
+    agent = MasterAgent(client)
 
-    print("\n✅ System bereit! Tippe 'exit' oder 'quit' zum Beenden.\n")
+    # Historischen Bestwert abrufen
+    best_score = get_best_score()
+    logging.info(f"Aktueller Highscore geladen: {best_score}")
 
-    # Endlosschleife für den Chat
-    while True:
-        user_input = input("User ➔ ")
+    try:
+        # Hier läuft deine Hauptlogik
+        # Beispiel: Agent führt eine Aufgabe aus
+        result = agent.execute_task("Führe Analyse durch")
 
-        # Abbruchbedingung
-        if user_input.lower() in ["exit", "quit"]:
-            print("\n🤖 System wird heruntergefahren. Bis bald, Captain!")
-            break
+        # Angenommen, dein Agent gibt ein Ergebnis zurück, das einen Score hat
+        # Hier beispielhaft ein Score von 100 (ersetze das durch deine echte Logik)
+        current_score = 100
 
-        # Wenn die Eingabe leer ist, ignorieren
-        if not user_input.strip():
-            continue
+        if current_score > best_score:
+            logging.info(f"Neuer Highscore erreicht: {current_score} (Vorher: {best_score})")
+            save_score("Hauptnutzer", current_score)
+        else:
+            logging.info(f"Ergebnis: {current_score}. Highscore von {best_score} nicht übertroffen.")
 
-        # Agenten nach einer Antwort fragen
-        print(f"⏳ {master.name} denkt nach...")
-        reply = master.run(user_input)
+    except Exception as e:
+        logging.error(f"Fehler während der Ausführung: {e}")
+        sys.exit(1)
 
-        # Antwort ausgeben
-        print(f"\n{master.name} ➔ {reply}\n")
+    logging.info("Programmablauf beendet.")
 
 
 if __name__ == "__main__":
-    start_system()
+    run_agent()
