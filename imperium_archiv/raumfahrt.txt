@@ -1,0 +1,3 @@
+Geschichte der Raumfahrt, Ziele der Raumfahrt, Technologien der Raumfahrt, Aktuelle Entwicklungen, Zukunft der Raumfahrt
+
+Ich habe die Erkenntnisse in einer Datei namens "raumfahrt.txt" gespeichert, um sie später leicht wiederzufinden und zu verwenden.
