@@ -3,11 +3,10 @@ import sys
 import logging
 from dotenv import load_dotenv
 from agents.master_agent import MasterAgent
-from core.client import initialize_client
+from core.client import get_groq_client  # Exakt auf deinen Client angepasst!
 from core.database import save_score, get_best_score
 
-# 1. Konfiguration laden (MUSS vor allem anderen passieren!)
-# Sucht nach einer .env Datei im Projektverzeichnis und lädt die Variablen in das OS-Environment
+# 1. Konfiguration laden
 load_dotenv()
 
 # Logging konfigurieren
@@ -15,36 +14,45 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 
 def run_agent():
-    logging.info("Starte Personal Agent System mit Umgebungskonfiguration...")
+    logging.info("Starte Personal Agent System mit KI-Feedback-Schleife...")
 
-    # Sicherheits-Check: Prüfen, ob wichtige Variablen geladen wurden
-    # Ersetze 'GROQ_API_KEY' durch den exakten Namen deiner Variable in der .env, falls er anders heißt
+    # Sicherheits-Check für API-Key
     if not os.getenv("GROQ_API_KEY"):
         logging.error("Kritischer Fehler: GROQ_API_KEY wurde in der Umgebung nicht gefunden!")
-        logging.error("Bitte stelle sicher, dass eine .env-Datei mit dem Key existiert.")
         sys.exit(1)
 
-    # 2. System initialisieren
-    # Der Client zieht sich den API-Key jetzt automatisch und sicher aus dem Betriebssystem
-    client = initialize_client()
-    agent = MasterAgent(client)
-
-    # Historischen Bestwert aus der SQLite-DB abrufen
-    best_score = get_best_score()
-    logging.info(f"Aktueller Highscore geladen: {best_score}")
-
     try:
-        # Hauptlogik des Agenten ausführen
-        result = agent.execute_task("Führe Analyse durch")
+        # 2. System mit deinem echten Groq-Client initialisieren
+        client = get_groq_client()
+        agent = MasterAgent(client)
 
-        # Beispielhafter Score zur Demonstration der Speicher-Logik
-        current_score = 100
+        # Historischen Bestwert aus der SQLite-DB abrufen
+        best_score = get_best_score()
+        logging.info(f"Aktueller Highscore geladen: {best_score}")
 
+        # Ein echter, komplexer Text, den der Agent analysieren soll
+        test_text = (
+            "Künstliche Intelligenz revolutioniert die Softwareentwicklung. "
+            "Durch automatisierte Pipelines (CI/CD) und den Einsatz von lokalen "
+            "Sprachmodellen können Entwickler repetitive Aufgaben automatisieren "
+            "und sich auf die Architektur konzentrieren. Die Sicherheit von API-Keys "
+            "bleibt dabei eine der größten Herausforderungen im DevSecOps-Bereich."
+        )
+
+        logging.info("Agent startet die Textanalyse und Selbstbewertung...")
+
+        # Der Agent führt die Aufgabe aus UND bewertet seine eigene Leistung
+        analysis_result, current_score = agent.execute_task(test_text)
+
+        logging.info(f"Analyse-Ergebnis: {analysis_result}")
+        logging.info(f"Vom Agenten selbst vergebener Performance-Score: {current_score}/100")
+
+        # Highscore-Logik mit echten Werten aus der Feedback-Schleife
         if current_score > best_score:
-            logging.info(f"Neuer Highscore erreicht: {current_score} (Vorher: {best_score})")
-            save_score("Hauptnutzer", current_score)
+            logging.info(f"🔥 Neuer Highscore erreicht: {current_score} Punkten! (Vorher: {best_score})")
+            save_score("MasterAgent_v1", current_score)
         else:
-            logging.info(f"Ergebnis: {current_score}. Highscore von {best_score} nicht übertroffen.")
+            logging.info(f"Ergebnis stabil. Der Highscore von {best_score} Punkten wurde nicht geschlagen.")
 
     except Exception as e:
         logging.error(f"Fehler während der Ausführung: {e}")
