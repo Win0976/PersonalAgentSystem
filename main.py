@@ -1,66 +1,78 @@
 import logging
 import time
-from core.database import init_db, get_all_time_highscore, save_agent_run
+from typing import Tuple
+
+# Hier importieren wir alle Core-Komponenten und Agenten sauber ein
 from core.client import get_groq_client
+from core.database import save_agent_run, get_all_time_highscore
 from agents.master_agent import MasterAgent
-from agents.reviewer_agent import ReviewerAgent  # Unser Neuzugang!
+from agents.reviewer_agent import ReviewerAgent
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# --- KONSTANTEN ---
+DEFAULT_PROMPT = "Zeig mir, was du kannst, Lehrer-Agent!"
+LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
 
 
-def main():
-    logging.info("Starte Multi-Agenten-Tribunal...")
+def setup_logging() -> None:
+    """Initialisiert das System-Logging im Terminal."""
+    logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
-    init_db()
+
+def get_user_input() -> str:
+    """Liest die Frage des Benutzers ein oder liefert den Standard-Text."""
+    print("\n" + "=" * 60)
+    user_text = input("Füge hier den Text ein, den das Tribunal analysieren soll:\n> ")
+    print("=" * 60 + "\n")
+
+    return user_text.strip() if user_text.strip() else DEFAULT_PROMPT
+
+
+def run_tribunal(master_agent: MasterAgent, reviewer_agent: ReviewerAgent, text: str) -> Tuple[str, int]:
+    """Orchestriert die beiden Phasen des Tribunals (Lehrer & Prüfer)."""
+    # Phase 1: Der Lehrer-Agent erklärt
+    logging.info("[Phase 1] Master-Agent startet Textanalyse...")
+    teacher_answer = master_agent.execute_task(text)
+    logging.info(f"-> Ergebnis Master-Agent: '{teacher_answer}'")
+
+    # Phase 2: Der unbestechliche Prüfer bewertet
+    logging.info("[Phase 2] Übergabe an Reviewer-Agent zur unbestechlichen Bewertung...")
+    score = reviewer_agent.evaluate_summary(text, teacher_answer)
+    logging.info(f"-> Urteil des Reviewers: {score}/100 Punkte")
+
+    return teacher_answer, score
+
+
+def evaluate_highscore(current_score: int) -> None:
+    """Holt den allzeit Highscore aus der DB und prüft, ob er geknackt wurde."""
+    highscore = get_all_time_highscore()
+    if current_score >= highscore:
+        logging.info(f"🏆 NEUER HIGHSCORE! Du hast den alten Highscore von {highscore} Punkten geschlagen!")
+    else:
+        logging.info(f"Highscore von {highscore} Punkten wurde vom Reviewer nicht vergeben.")
+
+
+# --- HAUPTPROGRAMM ---
+def main() -> None:
+    setup_logging()
+
+    # Initialisierung der Core-Komponenten
     client = get_groq_client()
-
-    # Beide Agenten initialisieren
     master_agent = MasterAgent(client)
     reviewer_agent = ReviewerAgent(client)
 
-    old_highscore = get_all_time_highscore()
-    print("\n" + "=" * 60)
-    print(f" 🏆  AKTUELLER ALL-TIME-HIGHSCORE: {old_highscore} Punkte")
-    print("=" * 60 + "\n")
+    # Input holen
+    text_to_analyze = get_user_input()
 
-    print("Füge hier den Text ein, den das Tribunal analysieren soll:")
-    text_to_analyze = input("> ").strip()
-
-    if not text_to_analyze:
-        logging.info("Kein Text eingegeben. Nutze Standard-Fallback-Text.")
-        text_to_analyze = (
-            "Das Multi-Agenten-Tribunal trennt strikt zwischen Generierung und Evaluation. "
-            "Während der MasterAgent die kreative Arbeit leistet, überwacht der ReviewerAgent "
-            "die Einhaltung aller Qualitäts- und Sicherheitsstandards. Dies minimiert KI-Halluzinationen."
-        )
-
-    print("\n" + "-" * 60)
-
-    # Zeitmessung für die gesamte Pipeline starten
+    # Zeitmessung starten & Tribunal ausführen
     start_time = time.time()
+    teacher_answer, score = run_tribunal(master_agent, reviewer_agent, text_to_analyze)
+    duration = round(time.time() - start_time, 2)
 
-    # Phase 1: Master-Agent generiert die Zusammenfassung
-    logging.info("[Phase 1] Master-Agent startet Textanalyse...")
-    summary = master_agent.execute_task(text_to_analyze)
-    logging.info(f"-> Ergebnis Master-Agent: '{summary}'")
+    # Daten speichern & Highscore prüfen
+    save_agent_run(text_to_analyze, teacher_answer, score, duration)
+    evaluate_highscore(score)
 
-    # Phase 2: Reviewer-Agent bewertet die Arbeit des Master-Agenten
-    logging.info("[Phase 2] Übergabe an Reviewer-Agent zur unbestechlichen Bewertung...")
-    score = reviewer_agent.evaluate_summary(text_to_analyze, summary)
-    logging.info(f"-> Urteil des Reviewers: {score}/100 Punkte")
-
-    execution_time = time.time() - start_time
-
-    # Ergebnisse in die Analytics-DB wegsichern
-    save_agent_run(text_to_analyze, summary, score, execution_time)
-
-    # Highscore-Check
-    if score > old_highscore:
-        logging.info(f"🔥 NEUER ALL-TIME-HIGHSCORE: {score} Punkte! (Kritiker war beeindruckt!)")
-    else:
-        logging.info(f"Highscore von {old_highscore} Punkten wurde vom Reviewer nicht vergeben.")
-
-    logging.info(f"Gesamtdauer des Tribunals: {round(execution_time, 2)}s. Beendet.")
+    logging.info(f"Gesamtdauer des Tribunals: {duration}s. Beendet.")
 
 
 if __name__ == "__main__":
